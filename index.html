@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Daily Crossword</title>
+<style>
+:root {--teal:#1f9dbf;--gold:#f5b041;--bg:#faf9f6;--card:#fff;--thin:#ddd;--gold-shade:#faf1de;}
+body{margin:0;background:var(--bg);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;display:flex;justify-content:center}
+.wrap{width:100%;max-width:980px;padding:18px}
+.card{background:var(--card);border-radius:12px;padding:16px;box-shadow:0 8px 20px rgba(0,0,0,.06)}
+.title{text-align:center;color:var(--teal);margin:0;font-size:clamp(1.1rem,3.6vw,1.6rem)}
+.subtitle{text-align:center;margin:6px 0;font-weight:600}
+.instructions{text-align:center;font-style:italic;color:#555;margin-bottom:12px}
+.crossword{display:grid;gap:6px;width:min(700px,95vw);margin:auto;padding:8px;grid-template-columns:repeat(var(--cols,15),1fr)}
+.cell{aspect-ratio:1/1;border:1px solid var(--thin);display:flex;align-items:center;justify-content:center;position:relative;background:#fff}
+.cell.block{background:var(--gold-shade)}
+.num{position:absolute;top:2px;left:3px;font-size:clamp(9px,1.6vw,13px);font-weight:700}
+.box{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:clamp(18px,3.5vw,28px);font-weight:700;text-transform:uppercase}
+.controls{text-align:center;margin-top:12px}
+button{padding:10px 14px;border:none;border-radius:8px;background:var(--gold);font-weight:700;cursor:pointer}
+.clues{display:flex;flex-direction:column;gap:16px;margin-top:16px}
+@media(min-width:900px){.clues{flex-direction:row}}
+.clue-col{flex:1}
+.clue-col h4{margin:0;color:var(--teal)}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--teal);color:#fff;padding:10px 14px;border-radius:10px;font-weight:700;opacity:0;transition:opacity .3s}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap"><div class="card">
+  <h1 id="title" class="title"></h1>
+  <div id="subtitle" class="subtitle"></div>
+  <div class="instructions">Type letters into the boxes. Progress saves automatically.</div>
+  <div id="grid" class="crossword"></div>
+  <div class="controls"><button id="clearBtn">🔄 Clear My Answers</button></div>
+  <div id="clues" class="clues"></div>
+</div></div>
+<div id="toast" class="toast">✅ Progress saved</div>
+
+<script>
+const baseRaw='https://raw.githubusercontent.com/chrisabbe/crossword/main/';
+const puzzleFile=new URLSearchParams(location.search).get('puzzle')||'puzzle1.json';
+fetch(baseRaw+puzzleFile)
+ .then(r=>r.json())
+ .then(data=>{document.getElementById('title').textContent=data.title;
+   document.getElementById('subtitle').textContent=data.subtitle||'';
+   build(data);})
+ .catch(e=>{document.getElementById('title').textContent='Crossword unavailable';
+   console.error(e);});
+
+function build(d){
+ const g=document.getElementById('grid'),C=d.cols,R=d.rows;
+ g.style.setProperty('--cols',C);
+ const nums=autoNums(d.grid);
+ const key='xwd:'+puzzleFile,saved=JSON.parse(localStorage.getItem(key)||'{}');
+ g.innerHTML='';
+ for(let r=0;r<R;r++)for(let c=0;c<C;c++){
+  const val=d.grid[r][c];const cell=document.createElement('div');cell.className='cell';
+  if(val==="#"){cell.classList.add('block');g.append(cell);continue;}
+  const n=nums[r][c];if(n){const num=document.createElement('div');num.className='num';num.textContent=n;cell.append(num);}
+  const box=document.createElement('div');box.className='box';box.contentEditable=true;
+  const k=r+'-'+c;if(saved[k])box.textContent=saved[k];
+  box.addEventListener('input',()=>{let t=(box.textContent||'').toUpperCase().replace(/[^A-Z]/g,'');
+   if(t.length>1)t=t.slice(-1);box.textContent=t;
+   if(t)saved[k]=t;else delete saved[k];
+   localStorage.setItem(key,JSON.stringify(saved));
+   toast('✅ Progress saved');});
+  cell.append(box);g.append(cell);
+ }
+ document.getElementById('clearBtn').onclick=()=>{g.querySelectorAll('.box').forEach(b=>b.textContent='');localStorage.removeItem(key);toast('Cleared');};
+ const cE=document.getElementById('clues');cE.innerHTML='';
+ const ac=document.createElement('div');ac.className='clue-col';
+ const dn=document.createElement('div');dn.className='clue-col';
+ ac.innerHTML='<h4>Across</h4>';dn.innerHTML='<h4>Down</h4>';
+ for(const n in d.across)ac.innerHTML+=`<div>${n}. ${d.across[n]}</div>`;
+ for(const n in d.down)dn.innerHTML+=`<div>${n}. ${d.down[n]}</div>`;
+ cE.append(ac,dn);
+}
+function autoNums(G){const R=G.length,C=G[0].length,N=Array.from({length:R},()=>Array(C).fill(0));let k=1;
+ for(let r=0;r<R;r++)for(let c=0;c<C;c++){if(G[r][c]==="#")continue;
+  const L=c===0||G[r][c-1]==="#",T=r===0||G[r-1]?.[c]==="#";if(L||T)N[r][c]=k++;}return N;}
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1200);}
+</script>
+</body>
+</html>
